@@ -1,0 +1,244 @@
+docker swarm tutotial:
+======================
+
+getting started:
+https://docs.docker.com/engine/swarm/swarm-tutorial/#docker-engine-112-or-newer
+
+docker machine create:
+https://docs.docker.com/machine/get-started/#create-a-machine
+
+https://docs.docker.com/machine/get-started/#operate-on-machines-without-specifying-the-name
+
+docker remove machine
+docker-machine rm "machinename"
+
+workaround "waiting for ssh..."
+https://docs.docker.com/machine/drivers/hyper-v/#reboot
+-> create external private network switch
+Hyper-V Manager > select machine > Create switch
+Primary Virtual Switch
+Use this switch for Hyper-V VMs instead of DockerNAT (which is only for Moby/d4win)
+
+
+1. 
+$ docker-machine ssh manager1
+
+2. 
+docker swarm init --advertise-addr <MANAGER-IP>
+
+3.
+$ docker info
+
+4.
+$ docker node ls
+
+
+/*add nodes to swarm
+**********************
+*/
+
+5. on another terminal
+docker-machine ssh worker1
+
+6. get join instructions from manager1
+docker swarm join-token manager
+
+7. on worker1 run
+docker swarm join \
+--token SWMTKN-1-5rvjhcebeqsm65ypqb6vi3mn7xbvulcul3noa7aghy4k51j2n6-5ry3al1mvd45aw2ft01abv1i8 \
+192.168.0.17:2377
+
+8. repeat same steps for worker2
+
+9. on manager node run
+docker node ls
+
+results:
+ID                           HOSTNAME  STATUS  AVAILABILITY  MANAGER STATUS
+pyr6lvvl9o4sq46ewgwdrb0wg    worker2   Ready   Active        Reachable
+xqv8aoya18hdgqm9c44bl6ihl *  manager1  Ready   Active        Leader
+zpjs7enb4xvzdpyea4hvgh43h    worker1   Ready   Active        Reachable
+
+
+/*deploy a service
+**********************
+*/
+10. on manager1 run
+docker service create --replicas 1 --name helloworld alpine ping docker.com
+
+result:
+vft3bj39yjdm3d4rkwgmw5wi3
+
+11. on manager1 run
+docker service ls
+
+result:
+ID            NAME        MODE        REPLICAS  IMAGE
+vft3bj39yjdm  helloworld  replicated  1/1       alpine:latest
+
+/*inspect service
+**********************
+*/
+
+12. on manager1 run
+docker service inspect --pretty vft3bj39yjdm
+
+note: result in json format run without "--pretty" flag
+
+result:
+ID:             vft3bj39yjdm3d4rkwgmw5wi3
+Name:           helloworld
+Service Mode:   Replicated
+ Replicas:      1
+Placement:
+UpdateConfig:
+ Parallelism:   1
+ On failure:    pause
+ Max failure ratio: 0
+ContainerSpec:
+ Image:         alpine:latest@sha256:58e1a1bb75db1b5a24a462dd5e2915277ea06438c3f105138f97eb53149673c4
+ Args:          ping docker.com
+Resources:
+Endpoint Mode:  vip
+
+13. to see which nodes service is running on
+docker service ps <serviceid>
+docker service ps vft3bj39yjdm
+
+14. on node where service is running 
+docker ps
+
+result:
+CONTAINER ID        IMAGE                                                                            COMMAND
+ CREATED             STATUS              PORTS               NAMES
+c33ec7844c96        alpine@sha256:58e1a1bb75db1b5a24a462dd5e2915277ea06438c3f105138f97eb53149673c4   "ping docker.com"
+ 8 minutes ago       Up 8 minutes                            helloworld.1.qb3bhy2faxvk7e0iiolt2r9v7
+ 
+/*
+scale the service in the swarm
+**********************
+*/
+
+15. docker service scale <SERVICE-ID>=<NUMBER-OF-TASKS>
+docker service scale helloworld=5
+
+16. get status
+docker service ps helloworld
+
+result:
+docker@manager1:~$ docker service ps helloworld
+ID            NAME          IMAGE          NODE      DESIRED STATE  CURRENT STATE           ERROR  PORTS
+qb3bhy2faxvk  helloworld.1  alpine:latest  manager1  Running        Running 12 minutes ago
+8tq6tedygx9q  helloworld.2  alpine:latest  worker1   Running        Running 9 seconds ago
+jb73tcocq0n5  helloworld.3  alpine:latest  worker2   Running        Running 5 seconds ago
+y86i6t922wcx  helloworld.4  alpine:latest  worker2   Running        Running 5 seconds ago
+kaoo5p4vwdwz  helloworld.5  alpine:latest  manager1  Running        Running 12 seconds ago
+
+17. to check the status of the service on each node run
+docker ps
+
+result:
+docker@worker2:~$ docker ps
+CONTAINER ID        IMAGE                                                                            COMMAND
+ CREATED             STATUS              PORTS               NAMES
+a77a70317970        alpine@sha256:58e1a1bb75db1b5a24a462dd5e2915277ea06438c3f105138f97eb53149673c4   "ping docker.com"
+ 2 minutes ago       Up 2 minutes                            helloworld.4.y86i6t922wcxfpvcozur0qgo1
+831046aa9ec6        alpine@sha256:58e1a1bb75db1b5a24a462dd5e2915277ea06438c3f105138f97eb53149673c4   "ping docker.com"
+ 2 minutes ago       Up 2 minutes                            helloworld.3.jb73tcocq0n5gfweey6ec7ct5
+
+/*
+remove service from the swarm
+**********************
+*/
+18. on manager1 
+docker service rm <SERVICE-ID>
+doccker service rm helloworld
+
+19. to check status run inspect
+docker service inspect helloworld
+
+result:
+docker@manager1:~$ docker service inspect helloworld
+[]
+Status: Error: no such service: helloworld, Code: 1
+
+/*
+add latest redis service to swarm
+**********************
+*/
+20. on manager1
+docker service create --replicas 3 --name redis --update-delay 10s redis:latest
+
+result:
+docker@manager1:~$ docker service create --replicas 3 --name redis --update-delay 10s redis:latest
+0uru69zsujm38jj67i8443zbw
+
+21. inspect
+docker service inspect --pretty redis
+
+result:
+docker@manager1:~$ docker service inspect --pretty redis
+
+ID:             0uru69zsujm38jj67i8443zbw
+Name:           redis
+Service Mode:   Replicated
+ Replicas:      3
+Placement:
+UpdateConfig:
+ Parallelism:   1
+ Delay:         10s
+ On failure:    pause
+ Max failure ratio: 0
+ContainerSpec:
+ Image:         redis:latest@sha256:4c8fb09e8d634ab823b1c125e64f0e1ceaf216025aa38283ea1b42997f1e8059
+Resources:
+Endpoint Mode:  vip
+
+22. remove the service as now we will test rolling updates to service
+docker service rm redis
+
+/*
+apply rolling updates to a service
+**********************
+*/
+23. docker service create --replicas 3 --name redis --update-delay 10s redis:3.0.6
+
+result:
+docker@manager1:~$ docker service create --replicas 3 --name redis --update-delay 10s redis:3.0.6
+wq1nd1b9ufd194zd3d884s52t
+
+24. inspect service
+docker service inspect --pretty redis
+
+result:
+docker@manager1:~$ docker service inspect --pretty redis
+
+ID:             wq1nd1b9ufd194zd3d884s52t
+Name:           redis
+Service Mode:   Replicated
+ Replicas:      3
+Placement:
+UpdateConfig:
+ Parallelism:   1
+ Delay:         10s
+ On failure:    pause
+ Max failure ratio: 0
+ContainerSpec:
+ Image:         redis:3.0.6@sha256:6a692a76c2081888b589e26e6ec835743119fe453d67ecf03df7de5b73d69842
+Resources:
+Endpoint Mode:  vip
+
+25. update service
+docker service update --image redis:3.0.7 redis
+
+result:
+docker@manager1:~$ docker service update --image redis:3.0.7 redis
+redis
+
+26. service inspect
+docker service inspect --pretty redis
+
+/*
+Drain a node on the swarm
+**********************
+*/
