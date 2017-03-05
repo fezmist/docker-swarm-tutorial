@@ -4,8 +4,7 @@ docker swarm tutotial:
 getting started:
 https://docs.docker.com/engine/swarm/swarm-tutorial/#docker-engine-112-or-newer
 
-docker machine create:
-https://docs.docker.com/machine/get-started/#create-a-machine
+
 
 https://docs.docker.com/machine/get-started/#operate-on-machines-without-specifying-the-name
 
@@ -18,6 +17,16 @@ https://docs.docker.com/machine/drivers/hyper-v/#reboot
 Hyper-V Manager > select machine > Create switch
 Primary Virtual Switch
 Use this switch for Hyper-V VMs instead of DockerNAT (which is only for Moby/d4win)
+
+docker machine create:
+https://docs.docker.com/machine/get-started/#use-machine-to-run-docker-containers
+Open powershell with administrator priveleges
+
+command to create:
+docker machine create --driver hyperv --hyperv-virtual-switch "Primary Virtual Switch" <machinename>
+docker machine create --driver hyperv --hyperv-virtual-switch "Primary Virtual Switch" manager1
+docker machine create --driver hyperv --hyperv-virtual-switch "Primary Virtual Switch" worker1
+docker machine create --driver hyperv --hyperv-virtual-switch "Primary Virtual Switch" worker2
 
 
 1. 
@@ -45,6 +54,11 @@ docker swarm join-token manager
 
 7. on worker1 run
 docker swarm join \
+--token SWMTKN-1-5rvjhcebeqsm65ypqb6vi3mn7xbvulcul3noa7aghy4k51j2n6-5ry3al1mvd45aw2ft01abv1i8 \
+192.168.0.17:2377
+
+Note: to join swarm as manager
+docker swarm join manager \
 --token SWMTKN-1-5rvjhcebeqsm65ypqb6vi3mn7xbvulcul3noa7aghy4k51j2n6-5ry3al1mvd45aw2ft01abv1i8 \
 192.168.0.17:2377
 
